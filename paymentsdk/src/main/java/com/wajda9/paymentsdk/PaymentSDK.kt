@@ -47,7 +47,9 @@ object MockPaymentSdk {
         if (simulateDelay) {
             delay(2000) // Simulate network latency
         }
-
+        if (amount < 1000){
+            PaymentResult.Failure("PAYMENT_REJECTED", "Amount is too low")
+        }
         // Simulate a success rate (e.g., 90% success)
         return if (amount > 0 && (1..100).random() > 10) {
             logger?.invoke("MockPaymentSdk", "Payment successful!")
