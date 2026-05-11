@@ -1,70 +1,101 @@
 package com.wajda9.paymentsdk
 
+import android.content.Context
+import android.content.Intent
 import android.util.Log
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
 
+/**
+ * MockPaymentSdk is a lightweight utility for simulating payment processing.
+ * It provides a simple API to initialize and execute mock transactions with a UI.
+ */
 object MockPaymentSdk {
 
     private var isInitialized = false
     private var apiKey: String? = null
+    private var currentPaymentDeferred: CompletableDeferred<PaymentResult>? = null
 
-// Enable or disable mock processing delays.
-    var simulateDelay: Boolean = true
+    /** Enable or disable tracking globally. */
+    var isEnabled: Boolean = true
 
+    /**
+     * Optional custom logger.
+     * Default: logs to Logcat with tag "MockPaymentSdk"
+     */
     var logger: ((String, String) -> Unit)? = { tag, message ->
         Log.d(tag, message)
     }
 
+    /**
+     * Initializes the SDK with an API key.
+     */
     fun init(apiKey: String) {
         this.apiKey = apiKey
         this.isInitialized = true
         logger?.invoke("MockPaymentSdk", "SDK Initialized with key: ${apiKey.take(4)}****")
     }
 
-
-     // Represents the result of a payment operation.
-
+    /**
+     * Represents the result of a payment operation.
+     */
     sealed class PaymentResult {
         object Success : PaymentResult()
         data class Failure(val errorCode: String, val message: String) : PaymentResult()
     }
 
     /**
-     * Simulates processing a payment.
-     *
+     * Starts the Payment UI and waits for the user to "Tap".
+     * 
+     * @param context The context used to start the activity.
      * @param amount The amount to charge.
      * @param currency The currency code (e.g., "USD").
      * @return [PaymentResult] indicating success or failure.
      */
-    suspend fun processPayment(amount: Double, currency: String): PaymentResult {
+    suspend fun processPayment(context: Context, amount: Double, currency: String): PaymentResult {
         if (!isInitialized) {
             logger?.invoke("MockPaymentSdk", "Error: SDK not initialized")
             return PaymentResult.Failure("NOT_INITIALIZED", "Call init() before processing payments")
         }
 
-        logger?.invoke("MockPaymentSdk", "Processing payment of $amount $currency...")
+        // If a payment is already in progress, fail the new one
+        if (currentPaymentDeferred != null) {
+            return PaymentResult.Failure("ALREADY_IN_PROGRESS", "A payment is already being processed")
+        }
 
-        if (simulateDelay) {
-            delay(2000) // Simulate network latency
+        val deferred = CompletableDeferred<PaymentResult>()
+        currentPaymentDeferred = deferred
+
+        logger?.invoke("MockPaymentSdk", "Launching Payment UI for $amount $currency...")
+
+        val intent = Intent(context, PaymentActivity::class.java).apply {
+            putExtra("amount", amount)
+            putExtra("currency", currency)
+            // Ensure we can start it from non-activity contexts if needed
+            if (context !is android.app.Activity) {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
         }
-         if (amount < 1000) {
-           return PaymentResult.Failure("PAYMENT_REJECTED", "Amount is too low")
-        }
-        // Simulate a success rate (e.g., 90% success)
-        return if (amount > 0 && (1..100).random() > 10) {
-            logger?.invoke("MockPaymentSdk", "Payment successful!")
-            PaymentResult.Success
-        } else {
-            val reason = if (amount <= 0) "Invalid amount" else "Insufficient funds"
-            logger?.invoke("MockPaymentSdk", "Payment failed: $reason")
-            PaymentResult.Failure("PAYMENT_REJECTED", reason)
-        }
+        context.startActivity(intent)
+
+        return deferred.await()
     }
 
+    /**
+     * Internal helper called by PaymentActivity to deliver the result back to the caller.
+     */
+    internal fun onPaymentFinished(result: PaymentResult) {
+        currentPaymentDeferred?.complete(result)
+        currentPaymentDeferred = null
+    }
 
+    /**
+     * Resets the SDK state and cancels any pending payment.
+     */
     fun reset() {
         isInitialized = false
         apiKey = null
+        currentPaymentDeferred?.complete(PaymentResult.Failure("RESET", "SDK was reset"))
+        currentPaymentDeferred = null
         logger?.invoke("MockPaymentSdk", "SDK state reset")
     }
 }
