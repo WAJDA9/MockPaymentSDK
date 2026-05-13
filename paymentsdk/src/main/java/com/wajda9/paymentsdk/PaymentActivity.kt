@@ -41,10 +41,10 @@ class PaymentActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
         }
         
         val logoImageView = ImageView(this).apply {
-            // Placeholder for logo - replace with R.drawable.your_logo
-            setImageResource(android.R.drawable.app_logo_blue)
+            // Use project resource instead of android.R
+            setImageResource(R.drawable.app_logo_blue)
             layoutParams = LinearLayout.LayoutParams(120, 120)
-            alpha = 0.5f
+            alpha = 1.0f // Increased alpha for better visibility
         }
         logoContainer.addView(logoImageView)
 
@@ -78,8 +78,8 @@ class PaymentActivity : AppCompatActivity(), NfcAdapter.ReaderCallback {
 
         // Center Illustration
         val illustrationImageView = ImageView(this).apply {
-            // Placeholder for illustration - replace with R.drawable.nfc_tap_icon
-            setImageResource(android.R.drawable.nfc_tap)
+            // Use project resource instead of android.R
+            setImageResource(R.drawable.nfc_tap)
             layoutParams = LinearLayout.LayoutParams(450, 450).apply {
                 gravity = Gravity.CENTER
             }
